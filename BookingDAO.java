@@ -1,110 +1,117 @@
 import java.sql.*;
 import java.util.*;
 
-public class BookingDAO {
+public class BusDAO {
 
-    public boolean addBooking(int userId, int busId, int numSeats, double totalPrice, String date) {
+    public List<Bus> getAllBuses() {
+        List<Bus> list = new ArrayList<>();
         try {
             Connection con = DBConnection.getConnection();
-            String sql = "INSERT INTO bookings (user_id, bus_id, num_seats, total_price, booking_date) VALUES (?,?,?,?,?)";
-            PreparedStatement ps = con.prepareStatement(sql);
-            ps.setInt(1, userId);    ps.setInt(2, busId);
-            ps.setInt(3, numSeats);  ps.setDouble(4, totalPrice);
-            ps.setString(5, date);
-            int rows = ps.executeUpdate();
-            con.close();
-            return rows > 0;
-        } catch (Exception e) { System.out.println(e.getMessage()); return false; }
-    }
-
-    public List<Booking> getBookingsByUser(int userId) {
-        List<Booking> list = new ArrayList<>();
-        try {
-            Connection con = DBConnection.getConnection();
-            PreparedStatement ps = con.prepareStatement("SELECT * FROM bookings WHERE user_id = ?");
-            ps.setInt(1, userId);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) list.add(mapBooking(rs));
+            ResultSet rs = con.createStatement().executeQuery("SELECT * FROM buses");
+            while (rs.next()) list.add(mapBus(rs));
             con.close();
         } catch (Exception e) { System.out.println(e.getMessage()); }
         return list;
     }
 
-    public Booking getBookingById(int bookingId) {
+    public List<Bus> searchBuses(String from, String to, String date) {
+        List<Bus> list = new ArrayList<>();
         try {
             Connection con = DBConnection.getConnection();
-            PreparedStatement ps = con.prepareStatement("SELECT * FROM bookings WHERE booking_id = ?");
-            ps.setInt(1, bookingId);
+            String sql = "SELECT * FROM buses WHERE from_location = ? AND to_location = ? AND travel_date = ?";
+            PreparedStatement ps = con.prepareStatement(sql);
+            ps.setString(1, from);
+            ps.setString(2, to);
+            ps.setString(3, date);
             ResultSet rs = ps.executeQuery();
-            if (rs.next()) { Booking b = mapBooking(rs); con.close(); return b; }
+            while (rs.next()) list.add(mapBus(rs));
+            con.close();
+        } catch (Exception e) { System.out.println(e.getMessage()); }
+        return list;
+    }
+
+    public Bus getBusById(int busId) {
+        try {
+            Connection con = DBConnection.getConnection();
+            PreparedStatement ps = con.prepareStatement("SELECT * FROM buses WHERE bus_id = ?");
+            ps.setInt(1, busId);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) { Bus b = mapBus(rs); con.close(); return b; }
             con.close();
         } catch (Exception e) { System.out.println(e.getMessage()); }
         return null;
     }
 
-    public boolean deleteBooking(int bookingId) {
+    public boolean addBus(String name, String number, String from, String to, String via,
+                          String date, String depTime, int seats, double price) {
         try {
             Connection con = DBConnection.getConnection();
-            PreparedStatement ps = con.prepareStatement("DELETE FROM bookings WHERE booking_id = ?");
-            ps.setInt(1, bookingId);
+            String sql = "INSERT INTO buses (bus_name, bus_number, from_location, to_location, via, travel_date, departure_time, total_seats, available_seats, price) VALUES (?,?,?,?,?,?,?,?,?,?)";
+            PreparedStatement ps = con.prepareStatement(sql);
+            ps.setString(1, name);   ps.setString(2, number);
+            ps.setString(3, from);   ps.setString(4, to);
+            ps.setString(5, via);    ps.setString(6, date);
+            ps.setString(7, depTime);
+            ps.setInt(8, seats);     ps.setInt(9, seats);
+            ps.setDouble(10, price);
             int rows = ps.executeUpdate();
             con.close();
             return rows > 0;
         } catch (Exception e) { System.out.println(e.getMessage()); return false; }
     }
 
-    public List<Booking> getAllBookings() {
-        List<Booking> list = new ArrayList<>();
+    public boolean deleteBus(int busId) {
         try {
             Connection con = DBConnection.getConnection();
-            ResultSet rs = con.createStatement().executeQuery("SELECT * FROM bookings");
-            while (rs.next()) list.add(mapBooking(rs));
+            PreparedStatement ps = con.prepareStatement("DELETE FROM buses WHERE bus_id = ?");
+            ps.setInt(1, busId);
+            int rows = ps.executeUpdate();
             con.close();
-        } catch (Exception e) { System.out.println(e.getMessage()); }
-        return list;
+            return rows > 0;
+        } catch (Exception e) { System.out.println(e.getMessage()); return false; }
     }
 
-    // Check if a bus has any existing bookings
-    public boolean busHasBookings(int busId) {
+    public boolean reduceSeats(int busId, int seats) {
         try {
             Connection con = DBConnection.getConnection();
             PreparedStatement ps = con.prepareStatement(
-                "SELECT COUNT(*) FROM bookings WHERE bus_id = ?");
-            ps.setInt(1, busId);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
-                boolean has = rs.getInt(1) > 0;
-                con.close();
-                return has;
-            }
+                "UPDATE buses SET available_seats = available_seats - ? WHERE bus_id = ?");
+            ps.setInt(1, seats); ps.setInt(2, busId);
+            int rows = ps.executeUpdate();
             con.close();
-        } catch (Exception e) { System.out.println(e.getMessage()); }
-        return false;
+            return rows > 0;
+        } catch (Exception e) { System.out.println(e.getMessage()); return false; }
     }
 
-    public int getTotalBookings() {
+    public boolean restoreSeats(int busId, int seats) {
         try {
             Connection con = DBConnection.getConnection();
-            ResultSet rs = con.createStatement().executeQuery("SELECT COUNT(*) FROM bookings");
+            PreparedStatement ps = con.prepareStatement(
+                "UPDATE buses SET available_seats = available_seats + ? WHERE bus_id = ?");
+            ps.setInt(1, seats); ps.setInt(2, busId);
+            int rows = ps.executeUpdate();
+            con.close();
+            return rows > 0;
+        } catch (Exception e) { System.out.println(e.getMessage()); return false; }
+    }
+
+    public int getTotalBuses() {
+        try {
+            Connection con = DBConnection.getConnection();
+            ResultSet rs = con.createStatement().executeQuery("SELECT COUNT(*) FROM buses");
             if (rs.next()) { int c = rs.getInt(1); con.close(); return c; }
         } catch (Exception e) { System.out.println(e.getMessage()); }
         return 0;
     }
 
-    public double getTotalRevenue() {
-        try {
-            Connection con = DBConnection.getConnection();
-            ResultSet rs = con.createStatement().executeQuery("SELECT SUM(total_price) FROM bookings");
-            if (rs.next()) { double t = rs.getDouble(1); con.close(); return t; }
-        } catch (Exception e) { System.out.println(e.getMessage()); }
-        return 0.0;
-    }
-
-    private Booking mapBooking(ResultSet rs) throws Exception {
-        return new Booking(
-            rs.getInt("booking_id"), rs.getInt("user_id"),
-            rs.getInt("bus_id"),     rs.getInt("num_seats"),
-            rs.getDouble("total_price"), rs.getString("booking_date")
+    private Bus mapBus(ResultSet rs) throws Exception {
+        return new Bus(
+            rs.getInt("bus_id"),         rs.getString("bus_name"),
+            rs.getString("bus_number"),  rs.getString("from_location"),
+            rs.getString("to_location"), rs.getString("via"),
+            rs.getString("travel_date"), rs.getString("departure_time"),
+            rs.getInt("total_seats"),    rs.getInt("available_seats"),
+            rs.getDouble("price")
         );
     }
 }
